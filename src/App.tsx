@@ -42,7 +42,7 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/PersonalTrainer/">
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
