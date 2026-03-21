@@ -12,6 +12,7 @@ interface AppState {
     session: Session | null;
     loading: boolean;
     initialized: boolean;
+    profileId: number | null;
 
     // Auth Actions
     setSession: (session: Session | null) => void;
@@ -48,19 +49,20 @@ export const useStore = create<AppState>((set, get) => ({
     session: null,
     loading: false,
     initialized: false,
+    profileId: null,
 
     setSession: (session) => {
         set({ session });
         if (session) {
             get().initialize();
         } else {
-            set({ clients: [], packages: [], sales: [], payments: [], lessons: [], initialized: false });
+            set({ clients: [], packages: [], sales: [], payments: [], lessons: [], profileId: null, initialized: false });
         }
     },
 
     signOut: async () => {
         await supabase.auth.signOut();
-        set({ session: null, clients: [], packages: [], sales: [], payments: [], lessons: [], initialized: false });
+        set({ session: null, clients: [], packages: [], sales: [], payments: [], lessons: [], profileId: null, initialized: false });
     },
 
     initialize: async () => {
@@ -68,6 +70,16 @@ export const useStore = create<AppState>((set, get) => ({
         set({ loading: true });
 
         try {
+            // 1. Get User Profile ID first
+            const { data: profile, error: profileError } = await supabase
+                .from('user_profiles')
+                .select('id')
+                .single();
+            
+            if (profileError) throw profileError;
+            const profileId = profile.id;
+
+            // 2. Load all other data
             const [
                 { data: clients },
                 { data: packages },
@@ -83,6 +95,7 @@ export const useStore = create<AppState>((set, get) => ({
             ]);
 
             set({
+                profileId,
                 clients: (clients || []).map(c => ({
                     ...c,
                     taxCode: c.tax_code,
@@ -119,7 +132,11 @@ export const useStore = create<AppState>((set, get) => ({
     },
 
     addClient: async (clientData) => {
+        const { profileId } = get();
+        if (!profileId) throw new Error("Utente non inizializzato");
+
         const { data, error } = await supabase.from('clients').insert([{
+            user_id: profileId,
             name: clientData.name,
             email: clientData.email,
             phone: clientData.phone,
@@ -165,7 +182,11 @@ export const useStore = create<AppState>((set, get) => ({
     },
 
     addPackage: async (pkgData) => {
+        const { profileId } = get();
+        if (!profileId) throw new Error("Utente non inizializzato");
+
         const { data, error } = await supabase.from('package_templates').insert([{
+            user_id: profileId,
             name: pkgData.name,
             default_price: pkgData.defaultPrice,
             lesson_count: pkgData.lessonCount
@@ -199,7 +220,11 @@ export const useStore = create<AppState>((set, get) => ({
     },
 
     addSale: async (saleData) => {
+        const { profileId } = get();
+        if (!profileId) throw new Error("Utente non inizializzato");
+
         const { data, error } = await supabase.from('sales').insert([{
+            user_id: profileId,
             client_id: saleData.clientId,
             package_template_id: saleData.packageTemplateId,
             description: saleData.description,
@@ -243,7 +268,11 @@ export const useStore = create<AppState>((set, get) => ({
     },
 
     addPayment: async (paymentData) => {
+        const { profileId } = get();
+        if (!profileId) throw new Error("Utente non inizializzato");
+
         const { data, error } = await supabase.from('payments').insert([{
+            user_id: profileId,
             sale_id: paymentData.saleId,
             amount: paymentData.amount,
             method: paymentData.method,
@@ -284,7 +313,11 @@ export const useStore = create<AppState>((set, get) => ({
     },
 
     addLesson: async (lessonData) => {
+        const { profileId } = get();
+        if (!profileId) throw new Error("Utente non inizializzato");
+
         const { data, error } = await supabase.from('lessons').insert([{
+            user_id: profileId,
             sale_id: lessonData.saleId,
             date: lessonData.date,
             start_time: lessonData.startTime,
